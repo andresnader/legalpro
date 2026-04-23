@@ -14,12 +14,42 @@ export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
 
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError("");
     try {
       await signIn("google", { callbackUrl: "/dashboard" });
+    } catch (err) {
+      setError("Error al iniciar sesión");
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const result = await signIn("credentials", {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError("Email o contraseña incorrectos");
+        setLoading(false);
+        return;
+      }
+
+      router.push("/dashboard");
+      router.refresh();
     } catch (err) {
       setError("Error al iniciar sesión");
       setLoading(false);
@@ -60,17 +90,30 @@ export default function LoginPage() {
               </span>
             </div>
           </div>
-          <form className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Correo electrónico</Label>
-              <Input id="email" type="email" placeholder="correo@ejemplo.com" />
+              <Input 
+                id="email" 
+                type="email" 
+                placeholder="correo@ejemplo.com"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
-              <Input id="password" type="password" />
+              <Input 
+                id="password" 
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                required
+              />
             </div>
-            <Button type="submit" className="w-full" disabled>
-              Iniciar Sesión
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Cargando..." : "Iniciar Sesión"}
             </Button>
           </form>
         </CardContent>

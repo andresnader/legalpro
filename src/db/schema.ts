@@ -4,14 +4,18 @@ import { relations } from 'drizzle-orm';
 export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', 'inactive', 'cancelled', 'pending']);
 export const paymentStatusEnum = pgEnum('payment_status', ['pending', 'completed', 'failed', 'refunded']);
 
+export const userRoleEnum = pgEnum('user_role', ['user', 'admin']);
+
 export const users = pgTable('users', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
   emailVerified: timestamp('email_verified'),
   image: text('image'),
+  password: text('password'),
   phone: text('phone'),
   cedula: text('cedula'),
+  role: userRoleEnum('role').default('user').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -51,6 +55,11 @@ export const coverages = pgTable('coverages', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const coveragesRelations = relations(coverages, ({ many }) => ({
+  planCoverages: many(planCoverages),
+  subscriptionCoverages: many(subscriptionCoverages),
+}));
+
 export const plans = pgTable('plans', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text('name').notNull(),
@@ -59,6 +68,11 @@ export const plans = pgTable('plans', {
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
+export const plansRelations = relations(plans, ({ many }) => ({
+  planCoverages: many(planCoverages),
+  subscriptions: many(subscriptions),
+}));
 
 export const planCoverages = pgTable('plan_coverages', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
