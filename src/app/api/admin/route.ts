@@ -37,18 +37,43 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // Get revenue by plan
-    const revenueByPlan = await db
-      .select({
-        planName: plans.name,
-        totalRevenue: sql<string>`COALESCE(SUM(${payments.amount}), 0)`,
-        count: count(payments.id),
-      })
-      .from(plans)
-      .leftJoin(subscriptions, eq(plans.id, subscriptions.planId))
-      .leftJoin(payments, eq(subscriptions.id, payments.subscriptionId))
-      .where(eq(payments.status, "completed"))
-      .groupBy(plans.name);
+    // Get revenue by plan (all plans with their subscriptions)
+    let revenueByPlan = [];
+    let allPlans = [];
+    try {
+      allPlans = await db.query.plans.findMany();
+      revenueByPlan = await db
+        .select({
+          planName: plans.name,
+          totalRevenue: sql<string>`COALESCE(SUM(${payments.amount}), 0)`,
+          count: count(payments.id),
+        })
+        .from(plans)
+        .leftJoin(subscriptions, eq(plans.id, subscriptions.planId))
+        .leftJoin(payments, eq(subscriptions.id, payments.subscriptionId))
+        .groupBy(plans.id, plans.name);
+    } catch (e) {
+      console.error("Revenue query error:", e);
+    }
+
+    // Get subscriptions by status
+    let subscriptionStats = { active: 0, pending: 0, cancelled: 0 };
+    try {
+      const stats = await db
+        .select({
+          status: subscriptions.status,
+          count: count(),
+        })
+        .from(subscriptions)
+        .groupBy(subscriptions.status);
+      stats.forEach(s => {
+        if (s.status === 'active') subscriptionStats.active = Number(s.count);
+        if (s.status === 'pending') subscriptionStats.pending = Number(s.count);
+        if (s.status === 'cancelled') subscriptionStats.cancelled = Number(s.count);
+      });
+    } catch (e) {
+      console.error("Stats query error:", e);
+    }
 
     return NextResponse.json({
       metrics: {
@@ -56,10 +81,12 @@ export async function GET(req: NextRequest) {
         totalSubscriptions: totalSubscriptions[0].count,
         activeSubscriptions: activeSubscriptions[0].count,
         totalPayments: totalPayments[0].count,
+        subscriptionStats,
       },
       recentUsers,
       recentSubscriptions,
       revenueByPlan,
+      plans: allPlans,
     });
   } catch (error) {
     console.error("Admin API error:", error);
